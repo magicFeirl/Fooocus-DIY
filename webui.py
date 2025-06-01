@@ -24,6 +24,56 @@ from modules.ui_gradio_extensions import reload_javascript
 from modules.auth import auth_enabled, check_auth
 from modules.util import is_json
 
+
+
+class AutoSaveDict(dict):
+    def __init__(self, filename, save_interval = 0):
+        super().__init__(self)
+        self.filename = filename
+        self.last_save = 0
+        self.save_interval = save_interval
+
+    def save(self):
+      now = time.time()
+      
+      if now - self.last_save > self.save_interval:
+        with open(self.filename, 'w', encoding='utf-8') as f:
+          json.dump(self, f)
+
+        self.last_save = now
+
+    def load(self, default_value):
+        try:
+            with open(self.filename, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                self.update(data)
+        except Exception as e:
+            print('Load webui config failed:', e)
+            self.update(default_value)
+        
+    def __setitem__(self, key, value):
+        r = super().__setitem__(key, value)
+        self.save() 
+        
+        return r
+
+    def update(self, *args):
+      r = super().update(*args)
+      self.save()
+
+      return r
+    
+webui_settings = AutoSaveDict('webui.json')
+
+webui_settings.load({
+    'loras': [],
+    'prompt': '',
+    'negative_prompt': ''
+})
+
+lora_ctrls = []
+
+
 def get_task(*args):
     args = list(args)
     args.pop(0)
@@ -167,6 +217,10 @@ with shared.gradio_root:
             gallery = gr.Gallery(label='Gallery', show_label=False, object_fit='contain', visible=True, height=768,
                                  elem_classes=['resizable_area', 'main_view', 'final_gallery', 'image_gallery'],
                                  elem_id='final_gallery')
+            
+            def handle_prompt_change(prompt):
+                webui_settings['prompt'] = prompt
+
             with gr.Row():
                 with gr.Column(scale=17):
                     prompt = gr.Textbox(show_label=False, placeholder="Type prompt here or paste parameters.", elem_id='positive_prompt',
@@ -175,6 +229,11 @@ with shared.gradio_root:
                     default_prompt = modules.config.default_prompt
                     if isinstance(default_prompt, str) and default_prompt != '':
                         shared.gradio_root.load(lambda: default_prompt, outputs=prompt)
+
+                    if not webui_settings['prompt']:
+                        handle_prompt_change(default_prompt)
+                    
+                    prompt.input(handle_prompt_change, inputs=[prompt])
 
                 with gr.Column(scale=3, min_width=0):
                     generate_button = gr.Button(label="Generate", value="Generate", elem_classes='type_row', elem_id='generate_button', visible=True)
@@ -203,6 +262,7 @@ with shared.gradio_root:
                 input_image_checkbox = gr.Checkbox(label='Input Image', value=modules.config.default_image_prompt_checkbox, container=False, elem_classes='min_check')
                 enhance_checkbox = gr.Checkbox(label='Enhance', value=modules.config.default_enhance_checkbox, container=False, elem_classes='min_check')
                 advanced_checkbox = gr.Checkbox(label='Advanced', value=modules.config.default_advanced_checkbox, container=False, elem_classes='min_check')
+   
             with gr.Row(visible=modules.config.default_image_prompt_checkbox) as image_input_panel:
                 with gr.Tabs(selected=modules.config.default_selected_image_input_tab_id):
                     with gr.Tab(label='Upscale or Variation', id='uov_tab') as uov_tab:
@@ -588,6 +648,31 @@ with shared.gradio_root:
                                              info='Describing what you do not want to see.', lines=2,
                                              elem_id='negative_prompt',
                                              value=modules.config.default_prompt_negative)
+                
+                with gr.Row():
+                    def handle_fill_data():
+                        lora = []
+                        for info in webui_settings['loras']:
+                            lora.extend(info)
+
+                        return (webui_settings['prompt'], webui_settings['negative_prompt'], *lora)
+                       
+                    def handle_fill_data_without_lora():
+                        return (webui_settings['prompt'], webui_settings['negative_prompt'])
+                    
+                    with gr.Column():
+                        fill_previous_prompt_button_without_lora = gr.Button(value='\U00002199\U0000FE0F Fill previous prompt')
+                        fill_previous_prompt_button = gr.Button(value='\U00002199\U0000FE0F Fill previous prompt & loras')
+                        fill_previous_prompt_button_without_lora.click(handle_fill_data_without_lora, outputs=[prompt, negative_prompt])
+
+                def handle_negative_prompt_change(negative_prompt):
+                    webui_settings['negative_prompt'] = negative_prompt
+
+                if not webui_settings['negative_prompt']:
+                    handle_negative_prompt_change(negative_prompt.value)
+
+                negative_prompt.input(handle_negative_prompt_change, inputs=[negative_prompt])
+
                 seed_random = gr.Checkbox(label='Random', value=True)
                 image_seed = gr.Textbox(label='Seed', value=0, max_lines=1, visible=False) # workaround for https://github.com/gradio-app/gradio/issues/5354
 
@@ -668,9 +753,19 @@ with shared.gradio_root:
                     refiner_model.change(lambda x: gr.update(visible=x != 'None'),
                                          inputs=refiner_model, outputs=refiner_switch, show_progress=False, queue=False)
 
-                with gr.Group():
-                    lora_ctrls = []
+               
+                def handle_lora_dropdown_change(enabled, filename, weight, index):
+                    index = int(index)
+                    data = [enabled, filename, weight]
 
+                    if index == len(webui_settings['loras']):
+                        webui_settings['loras'].append(data)
+                    else:
+                        webui_settings['loras'][index] = data
+
+                    webui_settings.save()
+
+                with gr.Group():
                     for i, (enabled, filename, weight) in enumerate(modules.config.default_loras):
                         with gr.Row():
                             lora_enabled = gr.Checkbox(label='Enable', value=enabled,
@@ -681,7 +776,14 @@ with shared.gradio_root:
                             lora_weight = gr.Slider(label='Weight', minimum=modules.config.default_loras_min_weight,
                                                     maximum=modules.config.default_loras_max_weight, step=0.01, value=weight,
                                                     elem_classes='lora_weight', scale=5)
-                            lora_ctrls += [lora_enabled, lora_model, lora_weight]
+                            components = [lora_enabled, lora_model, lora_weight]
+                            lora_ctrls += components
+
+                        handle_lora_dropdown_change(*[c.value for c in components], i)
+                        for component in components:
+                            component.input(handle_lora_dropdown_change, inputs=[*components, gr.Number(i, visible=False)])
+
+                    fill_previous_prompt_button.click(handle_fill_data, outputs=[prompt, negative_prompt, *lora_ctrls])
 
                 with gr.Row():
                     refresh_files = gr.Button(label='Refresh', value='\U0001f504 Refresh All Files', variant='secondary', elem_classes='refresh_button')
