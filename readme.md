@@ -1,3 +1,10 @@
+# Added features
+|  |  |
+|:--:|:--:|
+| ![](./example_images/p.gif) | ![](./example_images/r.gif) |
+| **标题显示进度** | **恢复上次 prompt** |
+
+# Original Fooocus readme
 <div align=center>
 <img src="https://github.com/lllyasviel/Fooocus/assets/19834515/483fb86d-c9a2-4c20-997c-46dafc124f25">
 </div>
