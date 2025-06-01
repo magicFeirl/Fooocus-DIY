@@ -242,6 +242,11 @@ with shared.gradio_root:
                     skip_button = gr.Button(label="Skip", value="Skip", elem_classes='type_row_half', elem_id='skip_button', visible=False)
                     stop_button = gr.Button(label="Stop", value="Stop", elem_classes='type_row_half', elem_id='stop_button', visible=False)
 
+                    def update_prompt(prompt):
+                        webui_settings['prompt'] = prompt
+                    
+                    generate_button.click(update_prompt, inputs=[prompt])
+
                     def stop_clicked(currentTask):
                         import ldm_patched.modules.model_management as model_management
                         currentTask.last_stop = 'stop'
