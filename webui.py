@@ -666,9 +666,11 @@ with shared.gradio_root:
                         return (webui_settings['prompt'], webui_settings['negative_prompt'])
                     
                     with gr.Column():
-                        fill_previous_prompt_button_without_lora = gr.Button(value='\U00002199\U0000FE0F Fill previous prompt')
                         fill_previous_prompt_button = gr.Button(value='\U00002199\U0000FE0F Fill previous prompt & loras')
-                        fill_previous_prompt_button_without_lora.click(handle_fill_data_without_lora, outputs=[prompt, negative_prompt])
+                    with gr.Column():
+                        fill_previous_prompt_button_without_lora = gr.Button(value='\U00002199\U0000FE0F Fill previous prompt')
+
+                    fill_previous_prompt_button_without_lora.click(handle_fill_data_without_lora, outputs=[prompt, negative_prompt])
 
                 def handle_negative_prompt_change(negative_prompt):
                     webui_settings['negative_prompt'] = negative_prompt
