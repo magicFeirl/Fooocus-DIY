@@ -1,8 +1,8 @@
 # Added features
-|  |  |
-|:--:|:--:|
-| ![](./example_images/p.gif) | ![](./example_images/r.gif) |
-| **标题显示进度** | **恢复上次 prompt** |
+|  |  | |
+|:--:|:--:|:--:|
+| ![](./example_images/p.gif) | ![](./example_images/r.gif) | ![](./example_images/ac.png) |
+| **标题显示进度** | **恢复上次 prompt** |  **prompt 提示** |
 
 # Original Fooocus readme
 <div align=center>
