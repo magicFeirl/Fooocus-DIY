@@ -380,8 +380,9 @@ class AutoComplete {
 
         this.textarea.addEventListener("input", (e) => {
             const diff = this._diffPrompt(this.prevPrompt, this.textarea.value);
-
-            if (diff.length != 1) {
+            
+            // 有空白符和逗号时隐藏补全面板
+            if (diff.length != 1 || /[\s,]/.test(e.data)) {
                 return this.hideAutoComplete();
             }
 
